@@ -1,0 +1,85 @@
+from flask import Flask, request, render_template, jsonify, send_file
+import requests
+import os
+import random
+import logging
+
+app = Flask(__name__)
+
+ELEVEN_LABS_API_KEY = "sk_ffa03a85ec7c755282fc7de0ed174c5b1f7fd1d89a5ab61d"  # Ganti dengan API key Anda
+VOICE_ID = "jBpfuIE2acCO8z3wKNLl"  # Ganti dengan voice_id yang benar, jika Gigi bukan ID yang benar, Anda perlu mendapatkan ID yang benar
+OUTPUT_PATH = "output.mp3"
+
+# Data khodam
+khodam = [
+    "Kucing kampung", "Anjing kampung", "Burung merpati", "Ikan mas koki", "Ayam kampung", "Bebek",
+    "Kambing", "Sapi", "Kerbau", "Kuda", "Kelinci", "Hamster", "Kura-kura", "Kuda poni", "Kupu-kupu",
+    "Katak", "Tokek", "Cicak", "Tikus", "Landak mini", "Bajak laut boneka", "Gantungan kunci lucu",
+    "Koin emas mainan", "Mobil remote control", "Pesawat mainan", "Bola sepak plastik", "Boneka beruang",
+    "Boneka panda", "Boneka kelinci", "Boneka monyet", "Boneka anjing", "Boneka kucing", "Layang-layang",
+    "Gasing", "Balon udara mainan", "Kelereng", "Komik", "Buku cerita", "Gelang karet warna-warni",
+    "Topi jerami", "Topi koboi", "Tas ransel kecil", "Tas selempang", "Dompet bergambar", "Sarung tangan",
+    "Kaos kaki lucu", "Sepatu roda", "Sepeda mini", "Sepatu kets bergambar", "Jam tangan digital",
+    "Kacamata hitam", "Kacamata baca", "Kalung mutiara mainan", "Cincin plastik", "Anting-anting lucu",
+    "Gelang emas palsu", "Bando telinga kelinci", "Ikat rambut pita", "Bando kucing", "Bando bunga",
+    "Topi santai", "Topi bola", "Sapu tangan lucu", "Jam dinding bergambar", "Lukisan hewan",
+    "Poster pemandangan", "Puzzle hewan", "Bantal bergambar", "Selimut bergambar", "Guling lucu",
+    "Karpet karakter", "Lampu tidur"
+]
+
+# Konfigurasi logging
+logging.basicConfig(level=logging.DEBUG)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/synthesize', methods=['POST'])
+def synthesize():
+    try:
+        data = request.get_json()
+        text = data.get('text')
+        logging.debug(f"Text for synthesis: {text}")
+
+        tts_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}/stream"
+        
+        headers = {
+            "Accept": "application/json",
+            "xi-api-key": ELEVEN_LABS_API_KEY
+        }
+        
+        payload = {
+            "text": text,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.8,
+                "style": 0.0,
+                "use_speaker_boost": True
+            }
+        }
+
+        response = requests.post(tts_url, headers=headers, json=payload, stream=True)
+        logging.debug(f"Response status code: {response.status_code}")
+        logging.debug(f"Response content: {response.content}")
+
+        if response.ok:
+            with open(OUTPUT_PATH, "wb") as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    f.write(chunk)
+            logging.debug(f'Audio content written to file "{OUTPUT_PATH}"')
+            return send_file(OUTPUT_PATH, as_attachment=True)
+        else:
+            logging.error(f"Failed to synthesize speech: {response.status_code} {response.content}")
+            return jsonify({"error": "Failed to synthesize speech"}), 500
+    except Exception as e:
+        logging.exception("An error occurred during synthesis")
+        return jsonify({"error": "An error occurred during synthesis"}), 500
+
+@app.route('/get_skill', methods=['GET'])
+def get_skill():
+    random_skill = random.choice(khodam)
+    return jsonify({"skill": random_skill})
+
+if __name__ == "__main__":
+    app.run(debug=True)

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cek Khodam Kamu!</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #e0f7fa;
+            color: #004d40;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #ffffff;
+            padding: 1.5em;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            font-size: 1.2em;
+            margin-bottom: 0.5em;
+        }
+        input[type="text"] {
+            padding: 0.5em;
+            font-size: 1em;
+            border: 1px solid #004d40;
+            border-radius: 5px;
+            margin-bottom: 1em;
+            width: 100%;
+        }
+        button {
+            background-color: #004d40;
+            color: #ffffff;
+            padding: 0.5em 1em;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #00796b;
+        }
+        #result {
+            margin-top: 2em;
+            text-align: center;
+        }
+        #share-button {
+            background-color: #00796b;
+            color: #ffffff;
+            padding: 0.5em 1em;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #share-button:hover {
+            background-color: #004d40;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cek Khodam Kamu!</h1>
+    <form method="POST">
+        <label for="name">Nama Kamu:</label>
+        <input type="text" id="name" name="name" required>
+        <button type="submit">Check</button>
+    </form>
+    <div id="result">
+        {% if skill and name %}
+        <h2>Hello {{ name }}! Khodam Kamu Adalah {{ skill }}</h2>
+        <button id="share-button">Share</button>
+        {% endif %}
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+        {% if skill and name %}
+        // Voice Output
+        const textToSpeak = `Hello {{ name }}! Khodam kamu adalah {{ skill }}.`;
+        const speech = new SpeechSynthesisUtterance(textToSpeak);
+        window.speechSynthesis.speak(speech);
+        
+        // Share Feature
+        document.getElementById('share-button').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            const canvas = await html2canvas(resultDiv);
+            const imageData = canvas.toDataURL('image/png');
+
+            // Upload the screenshot to the server
+            const response = await fetch('/upload_screenshot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `image=${encodeURIComponent(imageData)}&name=${encodeURIComponent('{{ name }}')}&skill=${encodeURIComponent('{{ skill }}')}`
+            });
+            const result = await response.json();
+            const imageUrl = result.image_url;
+            const shareText = `Hello {{ name }}! Khodam kamu adalah: {{ skill }}. Cek hasilnya di sini: ${imageUrl}`;
+
+            if (navigator.share) {
+                // Share with Web Share API
+                const response = await fetch(imageUrl);
+                const blob = await response.blob();
+                const file = new File([blob], 'result.png', { type: 'image/png' });
+
+                navigator.share({
+                    title: 'Cek Khodam Kamu',
+                    text: shareText,
+                    files: [file],
+                }).then(() => {
+                    console.log('Thanks for sharing!');
+                }).catch(console.error);
+            } else {
+                // Fallback: copy to clipboard
+                try {
+                    await navigator.clipboard.writeText(shareText);
+                    alert('Link dan teks telah disalin ke clipboard. Silakan tempel di aplikasi yang ingin Anda bagikan.');
+                } catch (err) {
+                    console.error('Failed to copy: ', err);
+                    alert('Gagal menyalin ke clipboard. Silakan salin secara manual: ' + shareText);
+                }
+            }
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
